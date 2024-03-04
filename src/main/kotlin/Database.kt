@@ -8,7 +8,12 @@ object Database {
     val lock = Object()
 
     init {
-        // Ручное добавление админа
+        // Ручное добавление для тестов
         users.add(Admin("1", "admin", "psswd"))
+        users.add(User("2", "rita", "1234"))
+        menu.add(MenuItem("taco", 30.0, 1))
+        menu.add(MenuItem("pasta", 20.0, 2))
+        menu.add(MenuItem("burger", 10.0, 3))
+        menu.add(MenuItem("pizza", 50.0, 4))
     }
 }
