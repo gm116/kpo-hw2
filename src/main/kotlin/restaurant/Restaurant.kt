@@ -1,3 +1,8 @@
+package restaurant
+
+import user.Admin
+import database.Database
+import user.User
 import java.util.*
 
 class Restaurant {

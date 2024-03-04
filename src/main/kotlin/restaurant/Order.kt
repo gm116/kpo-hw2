@@ -1,3 +1,7 @@
+package restaurant
+
+import user.User
+
 data class Order(
     val id: String,
     val user: User,

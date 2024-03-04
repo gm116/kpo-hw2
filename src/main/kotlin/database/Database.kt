@@ -1,3 +1,11 @@
+package database
+
+import restaurant.MenuItem
+import restaurant.Order
+import restaurant.Review
+import user.Admin
+import user.User
+
 object Database {
     val users = mutableListOf<User>()
     val menu = mutableListOf<MenuItem>()

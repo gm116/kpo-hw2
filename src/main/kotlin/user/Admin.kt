@@ -1,3 +1,5 @@
+package user
+
 class Admin(
     id: String,
     username: String,

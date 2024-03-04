@@ -1,3 +1,5 @@
+import restaurant.Restaurant
+
 fun main() {
     val restaurant = Restaurant()
 

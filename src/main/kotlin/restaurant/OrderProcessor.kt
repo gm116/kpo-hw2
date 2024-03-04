@@ -1,3 +1,6 @@
+package restaurant
+
+import database.Database
 import java.util.concurrent.Executors
 
 class OrderProcessor {
