@@ -1,7 +1,7 @@
 package restaurant
 
 data class Review(
-    val menuItem: MenuItem,
+    val order: Order,
     val rating: Int,
     val comment: String
 )

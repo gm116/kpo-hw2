@@ -1,17 +1,19 @@
 package restaurant
 
-import user.Admin
+import database.CsvManager
 import database.Database
+import user.Admin
 import user.User
 import java.util.*
 
 class Restaurant {
-    private val orderProcessor = OrderProcessor()
+    val orderProcessor = OrderProcessor()
     private val scanner = Scanner(System.`in`)
 
     fun authenticateUser(username: String, password: String): User? {
         synchronized(Database.lock) {
-            return Database.users.find { it.username == username && it.password == password }
+            val allUsers = Database.users + Database.admins
+            return allUsers.find { it.username == username && it.password == password }
         }
     }
 
@@ -23,11 +25,13 @@ class Restaurant {
         val password = scanner.next()
 
         synchronized(Database.lock) {
-            val newUser = User((Database.users.size + 1).toString(), username, password)
+            val newUser = User(username, password)
             Database.users.add(newUser)
+            CsvManager.saveUser(newUser)
             println("Пользователь успешно зарегистрирован.")
         }
     }
+
 
     private fun displayOptions(user: User) {
         println("Выберите действие:")
@@ -120,7 +124,7 @@ class Restaurant {
             val ordersForUser = Database.orders.filter { it.user == user }
             if (ordersForUser.isNotEmpty()) {
                 ordersForUser.forEach { order ->
-                    println("Заказ ID: ${order.id}, Статус: ${order.status}")
+                    println("ID заказа: ${order.id}, Статус: ${order.status}")
                     order.items.forEachIndexed { index, item ->
                         println("${index + 1}. ${item.name} - ${item.price}")
                     }
@@ -150,7 +154,7 @@ class Restaurant {
 
     private fun payOrder(user: User) {
         displayOrder(user)
-        println("Введите номер заказа для оплаты:")
+        println("Введите ID заказа для оплаты:")
         val orderId = scanner.next()
 
         synchronized(Database.lock) {
@@ -161,38 +165,40 @@ class Restaurant {
                 println("Хотите оплатить заказ? (1 - да, 2 - нет)")
 
                 when (scanner.nextInt()) {
-                    1 -> println("Заказ оплачен.")
+                    1 -> {
+                        println("Заказ оплачен.")
+                        CsvManager.addRevenueEntry(order.items.sumOf { it.price }) // Запись выручки в файл
+                    }
                     2 -> println("Так нельзя. Вас все равно заставили заплатить.")
-                    else -> println("Что то пошло не так, вы все равно оплатили заказ")
+                    else -> println("Что-то пошло не так, вы все равно оплатили заказ")
                 }
                 order.status = OrderStatus.PAID
                 leaveReview(order)
-                Database.revenue += order.items.sumOf { it.price }
             } else {
-                println("Неверный номер заказа или заказ не готов для оплаты.")
+                println("Неверный ID заказа или заказ не готов для оплаты.")
             }
         }
     }
+
 
 
     private fun leaveReview(order: Order) {
-        println("Оставьте отзыв о блюдах:")
-        order.items.forEach { menuItem ->
-            println("Блюдо: ${menuItem.name}")
-            println("Оценка от 1 до 5:")
-            val rating = scanner.nextInt()
-            scanner.nextLine() // считываем символ новой строки
+        println("Оставьте отзыв о заказе:")
+        println("Оценка от 1 до 5:")
+        val rating = scanner.nextInt()
+        scanner.nextLine() // считываем символ новой строки
 
-            println("Комментарий:")
-            val comment = scanner.nextLine()
+        println("Комментарий:")
+        val comment = scanner.nextLine()
 
-            synchronized(Database.lock) {
-                val review = Review(menuItem, rating, comment)
-                Database.reviews.add(review)
-                println("Отзыв успешно добавлен.")
-            }
+        synchronized(Database.lock) {
+            val review = Review(order, rating, comment)
+            Database.reviews.add(review)
+            CsvManager.saveReview(review)
+            println("Отзыв успешно добавлен.")
         }
     }
+
 
 
     private fun viewStatistics() {
@@ -201,10 +207,11 @@ class Restaurant {
             println("Выручка: ${Database.revenue}")
             println("Отзывы:")
             Database.reviews.forEachIndexed { index, review ->
-                println("${index + 1}. Блюдо: ${review.menuItem.name}, Оценка: ${review.rating}, Комментарий: ${review.comment}")
+                println("${index + 1}. Заказ ID: ${review.order.id}, Оценка: ${review.rating}, Комментарий: ${review.comment}")
             }
         }
     }
+
 
     private fun addMenuItem() {
         println("Добавление нового блюда:")
@@ -218,6 +225,7 @@ class Restaurant {
         synchronized(Database.lock) {
             val newMenuItem = MenuItem(name, price, complexity)
             Database.menu.add(newMenuItem)
+            CsvManager.saveMenuItem(newMenuItem)
             println("Блюдо добавлено в меню.")
         }
     }
