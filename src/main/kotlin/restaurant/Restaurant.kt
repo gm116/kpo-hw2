@@ -17,10 +17,22 @@ class Restaurant {
         }
     }
 
+    private fun isUsernameTaken(username: String): Boolean {
+        synchronized(Database.lock) {
+            val allUsers = Database.users + Database.admins
+            return allUsers.any { it.username == username }
+        }
+    }
+
+
     fun registerUser() {
         println("Регистрация нового пользователя:")
         println("Введите логин:")
         val username = scanner.next()
+        if (isUsernameTaken(username)) {
+            println("Пользователь с таким логином уже существует. Выберите другой логин.")
+            return
+        }
         println("Введите пароль:")
         val password = scanner.next()
 
@@ -45,6 +57,7 @@ class Restaurant {
         if (user is Admin) {
             println("6. Посмотреть статистику")
             println("7. Добавить блюдо в меню")
+            println("8. Удалить блюдо из меню")
         }
     }
 
@@ -61,6 +74,7 @@ class Restaurant {
                 5 -> payOrder(user)
                 6 -> if (user is Admin) viewStatistics()
                 7 -> if (user is Admin) addMenuItem()
+                8 -> if (user is Admin) removeMenuItem()
                 0 -> exit = true
                 else -> println("Неверный ввод. Пожалуйста, введите корректное значение.")
             }
@@ -119,7 +133,7 @@ class Restaurant {
     }
 
 
-    private fun displayOrder(user: User) {
+    private fun displayOrder(user: User): Boolean {
         synchronized(Database.lock) {
             val ordersForUser = Database.orders.filter { it.user == user }
             if (ordersForUser.isNotEmpty()) {
@@ -129,21 +143,25 @@ class Restaurant {
                         println("${index + 1}. ${item.name} - ${item.price}")
                     }
                     println("------")
+                    return true
                 }
             } else {
                 println("Заказы отсутствуют.")
             }
         }
+        return false
     }
 
     private fun cancelOrder(user: User) {
-        displayOrder(user)
+        if (!displayOrder(user)) {
+            return
+        }
         println("Введите номер заказа для отмены:")
         val orderId = scanner.next()
 
         synchronized(Database.lock) {
             val order = Database.orders.find { it.id == orderId && it.user == user }
-            if (order != null && order.status == OrderStatus.ACCEPTED) {
+            if (order != null && order.status == OrderStatus.PROCESSING) {
                 order.status = OrderStatus.CANCELED
                 println("Заказ отменен.")
             } else {
@@ -153,7 +171,10 @@ class Restaurant {
     }
 
     private fun payOrder(user: User) {
-        displayOrder(user)
+        if (!displayOrder(user)) {
+            return
+        }
+
         println("Введите ID заказа для оплаты:")
         val orderId = scanner.next()
 
@@ -169,6 +190,7 @@ class Restaurant {
                         println("Заказ оплачен.")
                         CsvManager.addRevenueEntry(order.items.sumOf { it.price }) // Запись выручки в файл
                     }
+
                     2 -> println("Так нельзя. Вас все равно заставили заплатить.")
                     else -> println("Что-то пошло не так, вы все равно оплатили заказ")
                 }
@@ -181,7 +203,6 @@ class Restaurant {
     }
 
 
-
     private fun leaveReview(order: Order) {
         println("Оставьте отзыв о заказе:")
         println("Оценка от 1 до 5:")
@@ -192,13 +213,12 @@ class Restaurant {
         val comment = scanner.nextLine()
 
         synchronized(Database.lock) {
-            val review = Review(order, rating, comment)
+            val review = Review(order.id, rating, comment)
             Database.reviews.add(review)
             CsvManager.saveReview(review)
             println("Отзыв успешно добавлен.")
         }
     }
-
 
 
     private fun viewStatistics() {
@@ -207,8 +227,15 @@ class Restaurant {
             println("Выручка: ${Database.revenue}")
             println("Отзывы:")
             Database.reviews.forEachIndexed { index, review ->
-                println("${index + 1}. Заказ ID: ${review.order.id}, Оценка: ${review.rating}, Комментарий: ${review.comment}")
+                println("${index + 1}. Заказ ID: ${review.orderId}, Оценка: ${review.rating}, Комментарий: ${review.comment}")
             }
+            val averageRating = if (Database.reviews.isNotEmpty()) {
+                Database.reviews.map { it.rating }.average()
+            } else {
+                0.0
+            }
+            val formattedAverageRating = String.format("%.2f", averageRating)
+            println("Средняя оценка: $formattedAverageRating")
         }
     }
 
@@ -227,6 +254,29 @@ class Restaurant {
             Database.menu.add(newMenuItem)
             CsvManager.saveMenuItem(newMenuItem)
             println("Блюдо добавлено в меню.")
+        }
+    }
+
+    private fun removeMenuItem() {
+        println("Удаление блюда из меню:")
+        displayMenu()
+        println("Введите номер блюда для удаления (0 для отмены):")
+
+        val menuItemIndex = scanner.nextInt() - 1
+
+        if (menuItemIndex == -1) {
+            println("Отменено.")
+            return
+        }
+
+        synchronized(Database.lock) {
+            if (menuItemIndex in Database.menu.indices) {
+                val removedMenuItem = Database.menu.removeAt(menuItemIndex)
+                println("${removedMenuItem.name} удалено из меню.")
+                CsvManager.removeMenuItem(removedMenuItem)
+            } else {
+                println("Неверный номер блюда.")
+            }
         }
     }
 }
