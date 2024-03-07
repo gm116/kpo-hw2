@@ -23,7 +23,7 @@ class CsvManager {
         }
 
         fun saveReview(review: Review) {
-            saveData(REVIEWS_FILE, "${review.order.id};${review.rating};${review.comment}")
+            saveData(REVIEWS_FILE, "${review.orderId};${review.rating};${review.comment}")
         }
 
 
@@ -115,14 +115,21 @@ class CsvManager {
             return File(filePath).useLines { lines ->
                 lines.map { line ->
                     val (orderId, rating, comment) = line.split(";")
-                    val order = Database.orders.find { it.id == orderId }
-                    if (order != null) {
-                        Review(order, rating.toInt(), comment)
-                    } else {
-                        null
-                    }
-                }.filterNotNull().toList()
+                    val review = Review(orderId, rating.toInt(), comment)
+                    Database.reviews.add(review)
+                    review
+                }.toList()
             }
         }
+        fun removeMenuItem(menuItem: MenuItem) {
+            val tempFile = File("$MENU_FILE.temp")
+            File(MENU_FILE).forEachLine {
+                if (!it.startsWith("${menuItem.name};${menuItem.price};${menuItem.complexity}")) {
+                    tempFile.appendText("$it\n")
+                }
+            }
+            tempFile.renameTo(File(MENU_FILE))
+        }
+
     }
 }
